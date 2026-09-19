@@ -1,0 +1,16 @@
+appId: com.chequesapp.desktop
+productName: ChequesApp
+directories:
+  buildResources: resources
+  output: dist
+files:
+  - out/**/*
+  - package.json
+win:
+  target:
+    - target: portable
+      arch:
+        - x64
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Selecciona todo el texto de un input numérico al enfocarlo, para que
+   escribir reemplace el valor en vez de tener que borrarlo primero. */
+input[data-select-on-focus]:focus {
+  outline: none;
+}
