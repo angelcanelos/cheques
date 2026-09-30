@@ -9,7 +9,8 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
-    "dist:win": "electron-vite build && electron-builder --win"
+    "dist:win": "electron-vite build && electron-builder --win",
+    "test": "node --test --experimental-strip-types tests/escp.test.ts tests/amountToWords.test.ts tests/windowsLayout.test.ts"
   },
   "dependencies": {
     "lucide-react": "^0.462.0",

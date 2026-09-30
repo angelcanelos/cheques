@@ -95,7 +95,8 @@ function convertInteger(n: number): string {
     parts.push(millones === 1 ? 'UN MILLÓN' : `${convertGroup(millones)} MILLONES`)
   }
   if (miles > 0) {
-    parts.push(miles === 1 ? 'MIL' : `${convertGroup(miles)} MIL`)
+    // En los cheques se escribe "UN MIL" (1,000-1,999), no solo "MIL".
+    parts.push(`${miles === 1 ? 'UN' : convertGroup(miles)} MIL`)
   }
   if (resto > 0) {
     parts.push(convertGroup(resto))

@@ -2,6 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Trabajadores: azul (por defecto) */
+  --brand-50: 239 246 255;
+  --brand-100: 219 234 254;
+  --brand-500: 37 99 235;
+  --brand-600: 29 78 216;
+  --brand-700: 30 64 175;
+}
+
+[data-mode='ejidatarios'] {
+  /* Ejidatarios: verde */
+  --brand-50: 240 253 244;
+  --brand-100: 220 252 231;
+  --brand-500: 22 163 74;
+  --brand-600: 21 128 61;
+  --brand-700: 22 101 52;
+}
+
 html,
 body,
 #root {

@@ -6,11 +6,20 @@ directories:
 files:
   - out/**/*
   - package.json
+  - resources/icon.png
+  - resources/fonts/**/*
 win:
+  icon: resources/icon.ico
   target:
-    - target: portable
+    - target: nsis
       arch:
         - x64
 nsis:
   oneClick: false
+  perMachine: false
   allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Cheques App
+  installerIcon: resources/icon.ico
+  uninstallerIcon: resources/icon.ico

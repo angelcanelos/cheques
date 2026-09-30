@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { RefObject, useEffect, useMemo, useRef, useState } from 'react'
 
 interface SearchableComboProps {
   value: string
@@ -8,6 +8,8 @@ interface SearchableComboProps {
   /** Se dispara cuando el usuario confirma un valor (Enter o clic en una sugerencia). */
   onConfirm?: (value: string) => void
   id?: string
+  /** Ref externo al <input>, para poder enfocarlo desde afuera. */
+  inputRef?: RefObject<HTMLInputElement>
 }
 
 /**
@@ -24,11 +26,13 @@ export default function SearchableCombo({
   items,
   placeholder,
   onConfirm,
-  id
+  id,
+  inputRef: externalRef
 }: SearchableComboProps): JSX.Element {
   const [open, setOpen] = useState(false)
   const [highlighted, setHighlighted] = useState(-1)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const internalRef = useRef<HTMLInputElement>(null)
+  const inputRef = externalRef ?? internalRef
   const listRef = useRef<HTMLUListElement>(null)
 
   const suggestions = useMemo(() => {

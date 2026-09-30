@@ -1,8 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
   CalibrationSettings,
-  CheckPrintData,
+  CheckRecord,
   HistoryFilters,
+  NewCheckInput,
+  PersonType,
+  PrintableCheck,
   Worker
 } from '../shared/types'
 
@@ -13,19 +16,28 @@ const api = {
     add: (name: string): Promise<Worker> => ipcRenderer.invoke('workers:add', name),
     rename: (id: string, name: string): Promise<void> =>
       ipcRenderer.invoke('workers:rename', id, name),
+    delete: (id: string): Promise<void> => ipcRenderer.invoke('workers:delete', id),
     setActive: (id: string, active: boolean): Promise<void> =>
       ipcRenderer.invoke('workers:setActive', id, active)
   },
+  ejidatarios: {
+    listActive: (): Promise<Ejidatario[]> => ipcRenderer.invoke('ejidatarios:listActive'),
+    listAll: (): Promise<Ejidatario[]> => ipcRenderer.invoke('ejidatarios:listAll'),
+    add: (name: string): Promise<Ejidatario> => ipcRenderer.invoke('ejidatarios:add', name),
+    rename: (id: string, name: string): Promise<void> =>
+      ipcRenderer.invoke('ejidatarios:rename', id, name),
+    delete: (id: string): Promise<void> => ipcRenderer.invoke('ejidatarios:delete', id),
+    setActive: (id: string, active: boolean): Promise<void> =>
+      ipcRenderer.invoke('ejidatarios:setActive', id, active)
+  },
   checks: {
-    insert: (input: {
-      workerId: string
-      workerName: string
-      amountCents: number
-      amountWords: string
-      checkDate: string
-    }) => ipcRenderer.invoke('checks:insert', input),
-    history: (filters: HistoryFilters) => ipcRenderer.invoke('checks:history', filters),
-    markReprinted: (id: string): Promise<void> => ipcRenderer.invoke('checks:markReprinted', id)
+    insert: (input: NewCheckInput): Promise<CheckRecord> =>
+      ipcRenderer.invoke('checks:insert', input),
+    listPending: (personType?: PersonType): Promise<CheckRecord[]> =>
+      ipcRenderer.invoke('checks:listPending', personType),
+    history: (filters: HistoryFilters): Promise<CheckRecord[]> =>
+      ipcRenderer.invoke('checks:history', filters),
+    deletePending: (id: string): Promise<void> => ipcRenderer.invoke('checks:deletePending', id)
   },
   calibration: {
     load: (): Promise<CalibrationSettings> => ipcRenderer.invoke('calibration:load'),
@@ -34,19 +46,21 @@ const api = {
     listPrinters: (): Promise<{ name: string; displayName: string }[]> =>
       ipcRenderer.invoke('calibration:listPrinters'),
     pickReferenceImage: (): Promise<string | null> =>
-      ipcRenderer.invoke('calibration:pickReferenceImage')
+      ipcRenderer.invoke('calibration:pickReferenceImage'),
+    referenceImageDataUrl: (settings?: CalibrationSettings): Promise<string | null> =>
+      ipcRenderer.invoke('calibration:referenceImageDataUrl', settings)
   },
   print: {
-    check: (data: CheckPrintData): Promise<void> => ipcRenderer.invoke('print:check', data),
-    preview: (data: CheckPrintData): Promise<string> =>
-      ipcRenderer.invoke('print:preview', data),
-    previewWithCalibration: (
-      data: CheckPrintData,
-      calibration: CalibrationSettings
-    ): Promise<string> =>
-      ipcRenderer.invoke('print:previewWithCalibration', data, calibration),
+    batch: (ids: string[]): Promise<number> => ipcRenderer.invoke('print:batch', ids),
+    reprint: (id: string): Promise<void> => ipcRenderer.invoke('print:reprint', id),
+    quickTest: (printerName: string): Promise<void> =>
+      ipcRenderer.invoke('print:quickTest', printerName),
+    fontTest: (calibration: CalibrationSettings): Promise<void> =>
+      ipcRenderer.invoke('print:fontTest', calibration),
     testPage: (calibration: CalibrationSettings): Promise<void> =>
-      ipcRenderer.invoke('print:testPage', calibration)
+      ipcRenderer.invoke('print:testPage', calibration),
+    preview: (check: PrintableCheck, calibration?: CalibrationSettings): Promise<string> =>
+      ipcRenderer.invoke('print:preview', check, calibration)
   }
 }
 

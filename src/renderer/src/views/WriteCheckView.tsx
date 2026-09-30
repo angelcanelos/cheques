@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { Eye, FileText, Printer } from 'lucide-react'
+import { CheckCircle2, Eye, FileText, Save } from 'lucide-react'
 import SearchableCombo from '../components/SearchableCombo'
+import ScaledPreview from '../components/ScaledPreview'
+import { useDialogs } from '../components/Dialogs'
 import { amountToPesosText } from '@shared/amountToWords'
-import { formatCurrency, toCents } from '../lib/currency'
-import type { Worker } from '@shared/types'
+import { formatWordsLine } from '@shared/format'
+import { toCents } from '../lib/currency'
+import { notifyChecksChanged } from '../lib/events'
+import { CatalogMode, modeSingular, modeTitle } from '../lib/mode'
+import type { CalibrationSettings, Worker, Ejidatario } from '@shared/types'
 
 function todayIso(): string {
   const now = new Date()
@@ -13,88 +18,95 @@ function todayIso(): string {
   return `${y}-${m}-${d}`
 }
 
-function formatDateDisplay(iso: string): string {
-  const [y, m, d] = iso.split('-')
-  return `${d}/${m}/${y}`
+type Person = Worker | Ejidatario
+
+interface WriteCheckViewProps {
+  mode: CatalogMode
 }
 
-export default function WriteCheckView(): JSX.Element {
-  const [workers, setWorkers] = useState<Worker[]>([])
-  const [workerName, setWorkerName] = useState('')
+export default function WriteCheckView({ mode }: WriteCheckViewProps): JSX.Element {
+  const { alert } = useDialogs()
+  const [people, setPeople] = useState<Person[]>([])
+  const [personName, setPersonName] = useState('')
   const [amountText, setAmountText] = useState('')
   const [date, setDate] = useState(todayIso())
   const [busy, setBusy] = useState(false)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [preview, setPreview] = useState<{ html: string; calibration: CalibrationSettings } | null>(
+    null
+  )
+  const personInputRef = useRef<HTMLInputElement>(null)
   const amountInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    refreshWorkers()
-  }, [])
-
-  async function refreshWorkers(): Promise<void> {
-    setWorkers(await window.api.workers.listActive())
-  }
+    const api = mode === 'ejidatarios' ? window.api.ejidatarios : window.api.workers
+    api.listActive().then(setPeople)
+  }, [mode])
 
   const amountValue = amountText.trim() === '' ? 0 : Number(amountText.replace(',', '.'))
   const amountValid = Number.isFinite(amountValue) && amountValue > 0
-  const wordsPreview = amountValid ? amountToPesosText(amountValue) : '—'
+  const wordsPreview = amountValid ? formatWordsLine(amountToPesosText(amountValue)) : '—'
 
-  function findMatchingWorker(): Worker | null {
-    const typed = workerName.trim().toLowerCase()
-    return workers.find((w) => w.name.trim().toLowerCase() === typed) ?? null
+  function findMatchingPerson(): Person | null {
+    const typed = personName.trim().toLowerCase()
+    return people.find((p) => p.name.trim().toLowerCase() === typed) ?? null
   }
 
-  function resetForm(): void {
-    setWorkerName('')
-    setAmountText('')
-    setDate(todayIso())
-  }
-
-  function validate(): Worker | null {
-    const worker = findMatchingWorker()
-    if (!worker) {
-      alert('Ese nombre no está en el catálogo. Agrégalo primero en la sección "Trabajadores".')
+  function validate(): Person | null {
+    const person = findMatchingPerson()
+    if (!person) {
+      alert(
+        `Ese nombre no está en el catálogo. Agrégalo primero en la sección "${modeTitle(mode)}".`
+      )
       return null
     }
     if (!amountValid) {
       alert('El monto debe ser mayor a cero.')
       return null
     }
-    return worker
-  }
-
-  function buildCheckData(worker: Worker) {
-    return {
-      payeeName: worker.name,
-      amountNumericText: formatCurrency(amountValue),
-      amountWordsText: amountToPesosText(amountValue),
-      dateText: formatDateDisplay(date)
-    }
+    return person
   }
 
   async function handlePreview(): Promise<void> {
-    const worker = validate()
-    if (!worker) return
-    const html = await window.api.print.preview(buildCheckData(worker))
-    setPreviewUrl(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
-  }
-
-  async function handlePrint(): Promise<void> {
-    const worker = validate()
-    if (!worker) return
-    setBusy(true)
-    try {
-      await window.api.print.check(buildCheckData(worker))
-      await window.api.checks.insert({
-        workerId: worker.id,
-        workerName: worker.name,
+    const person = validate()
+    if (!person) return
+    const calibration = await window.api.calibration.load()
+    const html = await window.api.print.preview(
+      {
+        workerName: person.name,
         amountCents: toCents(amountValue),
         amountWords: amountToPesosText(amountValue),
         checkDate: date
+      },
+      calibration
+    )
+    setPreview({ html, calibration })
+  }
+
+  async function handleSave(): Promise<void> {
+    if (busy) return
+    const person = validate()
+    if (!person) return
+    setBusy(true)
+    try {
+      await window.api.checks.insert({
+        workerId: person.id,
+        workerName: person.name,
+        amountCents: toCents(amountValue),
+        amountWords: amountToPesosText(amountValue),
+        checkDate: date,
+        personType: mode
       })
-      resetForm()
-    } catch (err) {
-      alert(`No se pudo imprimir el cheque:\n${(err as Error).message}`)
+      notifyChecksChanged()
+      const pending = (await window.api.checks.listPending(mode)).length
+      setNotice(
+        `Cheque de ${person.name} guardado. ${pending} pendiente${pending === 1 ? '' : 's'} por imprimir.`
+      )
+      setTimeout(() => setNotice(null), 4000)
+      setPersonName('')
+      setAmountText('')
+      setDate(todayIso())
+      personInputRef.current?.focus()
     } finally {
       setBusy(false)
     }
@@ -109,11 +121,14 @@ export default function WriteCheckView(): JSX.Element {
 
       <div className="space-y-5">
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-slate-600">Trabajador</label>
+          <label className="mb-1.5 block text-sm font-semibold text-slate-600">
+            {modeSingular(mode)}
+          </label>
           <SearchableCombo
-            value={workerName}
-            onChange={setWorkerName}
-            items={workers.map((w) => w.name)}
+            inputRef={personInputRef}
+            value={personName}
+            onChange={setPersonName}
+            items={people.map((p) => p.name)}
             placeholder="Escribe el nombre..."
             onConfirm={() => amountInputRef.current?.focus()}
           />
@@ -133,6 +148,7 @@ export default function WriteCheckView(): JSX.Element {
                 value={amountText}
                 placeholder="0.00"
                 onFocus={(e) => e.target.select()}
+                onKeyDown={(e) => e.key === 'Enter' && handleSave()}
                 onChange={(e) => {
                   const v = e.target.value
                   if (/^[0-9]*[.,]?[0-9]{0,2}$/.test(v)) setAmountText(v)
@@ -171,26 +187,38 @@ export default function WriteCheckView(): JSX.Element {
           <Eye size={18} /> Vista previa
         </button>
         <button
-          onClick={handlePrint}
+          onClick={handleSave}
           disabled={busy}
           className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-brand-600 px-5 py-3.5 font-bold text-white shadow-sm transition hover:bg-brand-700 disabled:opacity-60"
         >
-          <Printer size={20} /> {busy ? 'Imprimiendo…' : 'Imprimir'}
+          <Save size={20} /> Guardar cheque
         </button>
       </div>
 
-      {previewUrl && (
+      {notice && (
+        <div className="mt-5 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+          <CheckCircle2 size={18} /> {notice}
+        </div>
+      )}
+
+      {preview && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-          onClick={() => setPreviewUrl(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6"
+          onClick={() => setPreview(null)}
         >
           <div
-            className="max-h-[80vh] w-[900px] overflow-auto rounded-xl bg-white p-4 shadow-2xl"
+            className="flex max-h-full flex-col items-center rounded-xl bg-white p-5 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <iframe title="Vista previa del cheque" src={previewUrl} className="h-[350px] w-full border border-slate-200" />
+            <ScaledPreview
+              html={preview.html}
+              pageWidthMm={preview.calibration.pageWidthMm}
+              pageHeightMm={preview.calibration.pageHeightMm}
+              maxWidthPx={520}
+              maxHeightPx={560}
+            />
             <button
-              onClick={() => setPreviewUrl(null)}
+              onClick={() => setPreview(null)}
               className="mt-4 w-full rounded-lg bg-slate-100 px-4 py-2.5 font-semibold text-slate-700 hover:bg-slate-200"
             >
               Cerrar

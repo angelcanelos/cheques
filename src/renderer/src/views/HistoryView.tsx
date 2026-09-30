@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { CalendarDays, History, RotateCcw } from 'lucide-react'
 import { centsToAmount, formatCurrency } from '../lib/currency'
+import { useDialogs } from '../components/Dialogs'
+import { CatalogMode, modeSingular } from '../lib/mode'
 import type { CheckRecord } from '@shared/types'
 
 function todayIso(): string {
@@ -13,7 +15,12 @@ function monthAgoIso(): string {
   return d.toISOString().slice(0, 10)
 }
 
-export default function HistoryView(): JSX.Element {
+interface HistoryViewProps {
+  mode: CatalogMode
+}
+
+export default function HistoryView({ mode }: HistoryViewProps): JSX.Element {
+  const { alert, confirm } = useDialogs()
   const [records, setRecords] = useState<CheckRecord[]>([])
   const [workerFilter, setWorkerFilter] = useState('')
   const [useDateFilter, setUseDateFilter] = useState(false)
@@ -23,15 +30,17 @@ export default function HistoryView(): JSX.Element {
 
   useEffect(() => {
     refresh()
-  }, [workerFilter, useDateFilter, dateFrom, dateTo])
+  }, [workerFilter, useDateFilter, dateFrom, dateTo, mode])
 
   async function refresh(): Promise<void> {
-    const data = await window.api.checks.history({
-      workerName: workerFilter || undefined,
-      dateFrom: useDateFilter ? dateFrom : undefined,
-      dateTo: useDateFilter ? dateTo : undefined
-    })
-    setRecords(data)
+    setRecords(
+      await window.api.checks.history({
+        workerName: workerFilter || undefined,
+        dateFrom: useDateFilter ? dateFrom : undefined,
+        dateTo: useDateFilter ? dateTo : undefined,
+        personType: mode
+      })
+    )
   }
 
   async function handleReprint(): Promise<void> {
@@ -40,14 +49,13 @@ export default function HistoryView(): JSX.Element {
       alert('Elige un cheque de la lista primero.')
       return
     }
+    if (record.status === 'pending') {
+      alert('Ese cheque todavía está pendiente: imprímelo desde la sección "Imprimir".')
+      return
+    }
+    if (!(await confirm(`¿Reimprimir el cheque de ${record.workerName}? Sale en una forma nueva.`))) return
     try {
-      await window.api.print.check({
-        payeeName: record.workerName,
-        amountNumericText: formatCurrency(centsToAmount(record.amountCents)),
-        amountWordsText: record.amountWords,
-        dateText: record.checkDate.split('-').reverse().join('/')
-      })
-      await window.api.checks.markReprinted(record.id)
+      await window.api.print.reprint(record.id)
       await refresh()
     } catch (err) {
       alert(`No se pudo reimprimir el cheque:\n${(err as Error).message}`)
@@ -65,7 +73,7 @@ export default function HistoryView(): JSX.Element {
         <input
           type="text"
           value={workerFilter}
-          placeholder="Filtrar por trabajador"
+          placeholder={`Filtrar por ${modeSingular(mode).toLowerCase()}`}
           onChange={(e) => setWorkerFilter(e.target.value)}
           className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-base shadow-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
         />
@@ -99,8 +107,9 @@ export default function HistoryView(): JSX.Element {
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
             <tr>
               <th className="px-4 py-3">Fecha</th>
-              <th className="px-4 py-3">Trabajador</th>
+              <th className="px-4 py-3">{modeSingular(mode)}</th>
               <th className="px-4 py-3">Monto</th>
+              <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3">Impreso el</th>
               <th className="px-4 py-3">Reimpresiones</th>
             </tr>
@@ -108,7 +117,7 @@ export default function HistoryView(): JSX.Element {
           <tbody>
             {records.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
                   Sin cheques en este rango.
                 </td>
               </tr>
@@ -124,8 +133,19 @@ export default function HistoryView(): JSX.Element {
                 <td className="px-4 py-3">{r.checkDate}</td>
                 <td className="px-4 py-3 font-medium">{r.workerName}</td>
                 <td className="px-4 py-3">{formatCurrency(centsToAmount(r.amountCents))}</td>
+                <td className="px-4 py-3">
+                  {r.status === 'pending' ? (
+                    <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
+                      Pendiente
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                      Impreso
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-slate-500">
-                  {new Date(r.printedAt).toLocaleString('es-MX')}
+                  {r.printedAt ? new Date(r.printedAt).toLocaleString('es-MX') : '—'}
                 </td>
                 <td className="px-4 py-3">{r.reprintCount}</td>
               </tr>
