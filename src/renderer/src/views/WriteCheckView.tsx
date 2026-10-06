@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
-import { CheckCircle2, Eye, FileText, Save } from 'lucide-react'
+import { Button, DatePicker, Input, addToast } from '@heroui/react'
+import type { DatePickerProps } from '@heroui/react'
+import { parseDate } from '@internationalized/date'
+import { FileText, Save } from 'lucide-react'
+import PageHeader from '../components/PageHeader'
 import SearchableCombo from '../components/SearchableCombo'
-import ScaledPreview from '../components/ScaledPreview'
 import { useDialogs } from '../components/Dialogs'
 import { amountToPesosText } from '@shared/amountToWords'
 import { formatWordsLine } from '@shared/format'
 import { toCents } from '../lib/currency'
 import { notifyChecksChanged } from '../lib/events'
 import { CatalogMode, modeSingular, modeTitle } from '../lib/mode'
-import type { CalibrationSettings, Worker, Ejidatario } from '@shared/types'
+import type { Ejidatario, Worker } from '@shared/types'
 
 function todayIso(): string {
   const now = new Date()
@@ -24,6 +27,12 @@ interface WriteCheckViewProps {
   mode: CatalogMode
 }
 
+// HeroUI trae su propia copia de @internationalized/date; los tipos son equivalentes.
+const toDateValue = (iso: string): DatePickerProps['value'] =>
+  parseDate(iso) as unknown as DatePickerProps['value']
+
+const FIELD_LABEL = 'mb-2 block text-[15px] font-semibold text-ink-700'
+
 export default function WriteCheckView({ mode }: WriteCheckViewProps): JSX.Element {
   const { alert } = useDialogs()
   const [people, setPeople] = useState<Person[]>([])
@@ -31,10 +40,6 @@ export default function WriteCheckView({ mode }: WriteCheckViewProps): JSX.Eleme
   const [amountText, setAmountText] = useState('')
   const [date, setDate] = useState(todayIso())
   const [busy, setBusy] = useState(false)
-  const [notice, setNotice] = useState<string | null>(null)
-  const [preview, setPreview] = useState<{ html: string; calibration: CalibrationSettings } | null>(
-    null
-  )
   const personInputRef = useRef<HTMLInputElement>(null)
   const amountInputRef = useRef<HTMLInputElement>(null)
 
@@ -56,31 +61,19 @@ export default function WriteCheckView({ mode }: WriteCheckViewProps): JSX.Eleme
     const person = findMatchingPerson()
     if (!person) {
       alert(
-        `Ese nombre no está en el catálogo. Agrégalo primero en la sección "${modeTitle(mode)}".`
+        `Ese nombre no está en el catálogo. Elige uno de la lista o agrégalo primero en la sección "${modeTitle(mode)}".`,
+        { title: `${modeSingular(mode)} no encontrado`, tone: 'warning' }
       )
       return null
     }
     if (!amountValid) {
-      alert('El monto debe ser mayor a cero.')
+      alert('Escribe un monto mayor a cero para poder guardar el cheque.', {
+        title: 'Falta el monto',
+        tone: 'warning'
+      })
       return null
     }
     return person
-  }
-
-  async function handlePreview(): Promise<void> {
-    const person = validate()
-    if (!person) return
-    const calibration = await window.api.calibration.load()
-    const html = await window.api.print.preview(
-      {
-        workerName: person.name,
-        amountCents: toCents(amountValue),
-        amountWords: amountToPesosText(amountValue),
-        checkDate: date
-      },
-      calibration
-    )
-    setPreview({ html, calibration })
   }
 
   async function handleSave(): Promise<void> {
@@ -99,10 +92,12 @@ export default function WriteCheckView({ mode }: WriteCheckViewProps): JSX.Eleme
       })
       notifyChecksChanged()
       const pending = (await window.api.checks.listPending(mode)).length
-      setNotice(
-        `Cheque de ${person.name} guardado. ${pending} pendiente${pending === 1 ? '' : 's'} por imprimir.`
-      )
-      setTimeout(() => setNotice(null), 4000)
+      addToast({
+        title: `Cheque guardado: ${person.name}`,
+        description: `${pending} pendiente${pending === 1 ? '' : 's'} por imprimir.`,
+        color: 'success',
+        timeout: 4000
+      })
       setPersonName('')
       setAmountText('')
       setDate(todayIso())
@@ -113,119 +108,91 @@ export default function WriteCheckView({ mode }: WriteCheckViewProps): JSX.Eleme
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-10 py-9">
-      <div className="mb-7 flex items-center gap-3">
-        <FileText className="text-brand-600" size={30} />
-        <h1 className="text-2xl font-bold text-slate-900">Emitir Cheque</h1>
-      </div>
+    <div className="mx-auto max-w-[1600px] px-8 py-9 xl:px-12">
+      <PageHeader
+        icon={FileText}
+        title="Emitir Cheque"
+        subtitle={`Escribe el nombre del ${modeSingular(mode).toLowerCase()} y el monto; Enter avanza y guarda.`}
+      />
 
-      <div className="space-y-5">
-        <div>
-          <label className="mb-1.5 block text-sm font-semibold text-slate-600">
-            {modeSingular(mode)}
-          </label>
-          <SearchableCombo
-            inputRef={personInputRef}
-            value={personName}
-            onChange={setPersonName}
-            items={people.map((p) => p.name)}
-            placeholder="Escribe el nombre..."
-            onConfirm={() => amountInputRef.current?.focus()}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-6">
+      <div>
+        <div className="panel-lista space-y-8 p-8 xl:p-10">
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-600">Monto</label>
-            <div className="relative">
-              <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-lg text-slate-500">
-                $
-              </span>
-              <input
+            <label className={FIELD_LABEL}>{modeSingular(mode)}</label>
+            <SearchableCombo
+              inputRef={personInputRef}
+              value={personName}
+              onChange={setPersonName}
+              items={people.map((p) => p.name)}
+              placeholder="Escribe el nombre..."
+              onConfirm={() => amountInputRef.current?.focus()}
+              inputClassName="form-input h-[72px] w-full rounded-2xl px-6 text-[1.5rem]"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div>
+              <label className={FIELD_LABEL}>Monto</label>
+              <Input
                 ref={amountInputRef}
+                aria-label="Monto"
                 type="text"
                 inputMode="decimal"
-                value={amountText}
                 placeholder="0.00"
+                radius="lg"
+                value={amountText}
+                startContent={<span className="text-[1.5rem] text-ink-400">$</span>}
                 onFocus={(e) => e.target.select()}
                 onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-                onChange={(e) => {
-                  const v = e.target.value
+                onValueChange={(v) => {
                   if (/^[0-9]*[.,]?[0-9]{0,2}$/.test(v)) setAmountText(v)
                 }}
-                className="w-full rounded-lg border border-slate-300 bg-slate-50 py-3 pl-8 pr-4 text-lg text-slate-900 shadow-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+                classNames={{
+                  inputWrapper:
+                    'h-[72px] rounded-2xl border-[1.5px] border-surface-border bg-white px-6 shadow-none data-[hover=true]:border-ink-200 group-data-[focus=true]:border-brand-500 group-data-[focus=true]:ring-4 group-data-[focus=true]:ring-brand-100',
+                  input: 'text-[1.5rem] font-medium'
+                }}
+              />
+            </div>
+            <div>
+              <label className={FIELD_LABEL}>Fecha</label>
+              <DatePicker
+                aria-label="Fecha"
+                radius="lg"
+                showMonthAndYearPickers
+                value={toDateValue(date)}
+                onChange={(d) => d && setDate(String(d))}
+                classNames={{
+                  inputWrapper:
+                    'h-[72px] rounded-2xl border-[1.5px] border-surface-border bg-white px-6 shadow-none data-[hover=true]:border-ink-200 group-data-[focus=true]:border-brand-500 group-data-[focus=true]:ring-4 group-data-[focus=true]:ring-brand-100',
+                  input: 'text-[1.25rem]'
+                }}
+                calendarProps={{ classNames: { base: 'rounded-3xl' } }}
               />
             </div>
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-600">Fecha</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-3 text-lg text-slate-900 shadow-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-            />
+            <label className={FIELD_LABEL}>Monto en letras</label>
+            <div className="rounded-2xl border border-brand-200 bg-brand-50 px-6 py-5 text-[1.5rem] font-semibold leading-snug text-brand-800">
+              {wordsPreview}
+            </div>
           </div>
-        </div>
 
-        <div>
-          <label className="mb-1.5 block text-sm font-semibold text-slate-600">
-            Monto en letras
-          </label>
-          <div className="rounded-lg border border-brand-200 bg-brand-50 px-5 py-4 text-lg font-bold text-brand-800">
-            {wordsPreview}
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-10 flex gap-4">
-        <button
-          onClick={handlePreview}
-          className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-3.5 font-semibold text-brand-700 shadow-sm transition hover:bg-slate-50"
-        >
-          <Eye size={18} /> Vista previa
-        </button>
-        <button
-          onClick={handleSave}
-          disabled={busy}
-          className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-brand-600 px-5 py-3.5 font-bold text-white shadow-sm transition hover:bg-brand-700 disabled:opacity-60"
-        >
-          <Save size={20} /> Guardar cheque
-        </button>
-      </div>
-
-      {notice && (
-        <div className="mt-5 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
-          <CheckCircle2 size={18} /> {notice}
-        </div>
-      )}
-
-      {preview && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6"
-          onClick={() => setPreview(null)}
-        >
-          <div
-            className="flex max-h-full flex-col items-center rounded-xl bg-white p-5 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
+          <Button
+            color="primary"
+            radius="full"
+            size="lg"
+            isLoading={busy}
+            startContent={!busy && <Save size={22} />}
+            className="h-16 w-full text-[1.125rem] font-semibold shadow-boton"
+            onPress={handleSave}
           >
-            <ScaledPreview
-              html={preview.html}
-              pageWidthMm={preview.calibration.pageWidthMm}
-              pageHeightMm={preview.calibration.pageHeightMm}
-              maxWidthPx={520}
-              maxHeightPx={560}
-            />
-            <button
-              onClick={() => setPreview(null)}
-              className="mt-4 w-full rounded-lg bg-slate-100 px-4 py-2.5 font-semibold text-slate-700 hover:bg-slate-200"
-            >
-              Cerrar
-            </button>
-          </div>
+            Guardar cheque
+          </Button>
         </div>
-      )}
+
+      </div>
     </div>
   )
 }

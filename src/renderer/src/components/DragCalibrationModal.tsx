@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import Draggable from 'react-draggable'
-import { ImageOff, Save, X } from 'lucide-react'
+import { ImageOff, Save } from 'lucide-react'
+import {
+  Button,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  Slider
+} from '@heroui/react'
 import type { CalibrationSettings, FieldKey } from '@shared/types'
 
 const FIELD_LABELS: Record<FieldKey, string> = {
@@ -80,148 +89,149 @@ export default function DragCalibrationModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6">
-      <div className="flex max-h-full w-full max-w-4xl flex-col rounded-xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">Calibrar arrastrando</h2>
-            <p className="text-sm text-slate-500">
-              Arrastra cada dato al lugar correcto de la forma. Para afinar, toca un dato y usa las
-              flechas del teclado (0.5 mm; con Mayús, 1 mm).
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="flex items-center gap-4 border-b border-slate-100 bg-slate-50 px-6 py-2.5 text-sm text-slate-600">
-          <label className="flex items-center gap-2">
-            Zoom
-            <input
-              type="range"
-              min={1.5}
-              max={5}
-              step={0.1}
-              value={pxPerMm}
-              onChange={(e) => setPxPerMm(Number(e.target.value))}
-            />
-          </label>
-          {selected && (
-            <span className="font-medium text-brand-700">
-              {FIELD_LABELS[selected]}: X {fields[selected].xMm} mm · Y {fields[selected].yMm} mm
-            </span>
-          )}
-          <span className="ml-auto flex items-center gap-1 text-xs text-slate-400">
-            {!background && <ImageOff size={14} />}
-            {background
-              ? 'Fondo: imagen del formato'
-              : 'Sin imagen de fondo (cárgala en Calibración)'}
+    <Modal
+      isOpen
+      onOpenChange={(open) => !open && onClose()}
+      size="4xl"
+      scrollBehavior="inside"
+      placement="center"
+      backdrop="blur"
+      isDismissable={false}
+      classNames={{ base: 'rounded-[28px] outline-none' }}
+    >
+      <ModalContent>
+        <ModalHeader className="flex flex-col gap-1 px-7 pt-7">
+          <span className="text-[1.25rem] font-semibold text-ink-900">Calibrar arrastrando</span>
+          <span className="text-[13px] font-normal text-ink-500">
+            Arrastra cada dato al lugar correcto de la forma. Para afinar, toca un dato y usa las flechas
+            del teclado (0.5 mm; con Mayús, 1 mm).
           </span>
-        </div>
+        </ModalHeader>
 
-        <div
-          ref={containerRef}
-          tabIndex={0}
-          onKeyDown={handleKeyDown}
-          className="flex justify-center overflow-auto p-6 outline-none"
-        >
-          <div
-            className="relative shrink-0 select-none rounded border-2 border-dashed border-slate-300 bg-white shadow-inner"
-            style={{ width: canvasWidthPx, height: canvasHeightPx }}
-            onMouseDown={(e) => {
-              if (e.target === e.currentTarget) setSelected(null)
-            }}
-          >
-            {background && (
-              <img
-                src={background}
-                alt=""
-                draggable={false}
-                className="pointer-events-none absolute inset-0 h-full w-full opacity-50"
-              />
+        <ModalBody className="gap-0 px-0 py-0">
+          <div className="flex items-center gap-5 border-y border-surface-border bg-surface-muted/60 px-7 py-3 text-[13px] text-ink-600">
+            <Slider
+              aria-label="Zoom"
+              label="Zoom"
+              size="sm"
+              step={0.1}
+              minValue={1.5}
+              maxValue={5}
+              color="primary"
+              value={pxPerMm}
+              onChange={(v) => setPxPerMm(Array.isArray(v) ? v[0] : v)}
+              className="w-56"
+              hideValue
+            />
+            {selected && (
+              <span className="font-medium text-brand-700">
+                {FIELD_LABELS[selected]}: X {fields[selected].xMm} mm · Y {fields[selected].yMm} mm
+              </span>
             )}
-            {FIELD_ORDER.map((key) => {
-              const pos = fields[key]
-              const fontSizePx = pos.fontSizePt * PT_TO_MM * pxPerMm
-              const isSelected = selected === key
-              return (
-                <Draggable
-                  key={key}
-                  bounds="parent"
-                  position={{ x: pos.xMm * pxPerMm, y: pos.yMm * pxPerMm }}
-                  onStart={() => {
-                    setSelected(key)
-                    containerRef.current?.focus()
-                  }}
-                  onDrag={(_e, data) => move(key, data.x / pxPerMm, data.y / pxPerMm)}
-                  onStop={(_e, data) => move(key, data.x / pxPerMm, data.y / pxPerMm)}
-                >
-                  <div className="absolute cursor-move">
-                    <div
-                      className={`whitespace-nowrap rounded border bg-brand-50/80 px-1 font-medium text-slate-900 ring-1 hover:bg-brand-100 ${
-                        isSelected
-                          ? 'border-brand-600 ring-brand-500'
-                          : 'border-brand-400 ring-brand-200'
-                      }`}
-                      style={{
-                        fontSize: Math.max(fontSizePx, 9),
-                        fontWeight: pos.bold ? 700 : 500,
-                        transform: `translateX(${
-                          key !== 'date' && pos.align === 'center'
-                            ? '-50%'
-                            : key !== 'date' && pos.align === 'right'
-                              ? '-100%'
-                              : '0'
-                        })`
-                      }}
-                      title={FIELD_LABELS[key]}
-                    >
-                      {key === 'date' ? (
-                        <>
-                          <span>{sampleText.date.split(' ')[0]}</span>
-                          <span style={{ marginLeft: calibration.dateGapDayMonthMm * pxPerMm }}>
-                            {sampleText.date.split(' ')[1]}
-                          </span>
-                          <span style={{ marginLeft: calibration.dateGapMonthYearMm * pxPerMm }}>
-                            {sampleText.date.split(' ')[2]}
-                          </span>
-                        </>
-                      ) : (
-                        sampleText[key]
-                      )}
-                    </div>
-                  </div>
-                </Draggable>
-              )
-            })}
+            <span className="ml-auto flex items-center gap-1 text-[12px] text-ink-400">
+              {!background && <ImageOff size={14} />}
+              {background ? 'Fondo: imagen del formato' : 'Sin imagen de fondo (cárgala en Calibración)'}
+            </span>
           </div>
-        </div>
 
-        <div className="flex items-center justify-between border-t border-slate-200 px-6 py-4">
-          <p className="text-xs text-slate-400">
+          <div
+            ref={containerRef}
+            tabIndex={0}
+            onKeyDown={handleKeyDown}
+            className="flex justify-center overflow-auto p-7 outline-none"
+          >
+            <div
+              className="relative shrink-0 select-none rounded-2xl border-2 border-dashed border-ink-200 bg-white"
+              style={{ width: canvasWidthPx, height: canvasHeightPx }}
+              onMouseDown={(e) => {
+                if (e.target === e.currentTarget) setSelected(null)
+              }}
+            >
+              {background && (
+                <img
+                  src={background}
+                  alt=""
+                  draggable={false}
+                  className="pointer-events-none absolute inset-0 h-full w-full rounded-2xl opacity-50"
+                />
+              )}
+              {FIELD_ORDER.map((key) => {
+                const pos = fields[key]
+                const fontSizePx = pos.fontSizePt * PT_TO_MM * pxPerMm
+                const isSelected = selected === key
+                return (
+                  <Draggable
+                    key={key}
+                    bounds="parent"
+                    position={{ x: pos.xMm * pxPerMm, y: pos.yMm * pxPerMm }}
+                    onStart={() => {
+                      setSelected(key)
+                      containerRef.current?.focus()
+                    }}
+                    onDrag={(_e, data) => move(key, data.x / pxPerMm, data.y / pxPerMm)}
+                    onStop={(_e, data) => move(key, data.x / pxPerMm, data.y / pxPerMm)}
+                  >
+                    <div className="absolute cursor-move">
+                      <div
+                        className={`whitespace-nowrap rounded border bg-brand-50/80 px-1 font-medium text-ink-900 ring-1 hover:bg-brand-100 ${
+                          isSelected ? 'border-brand-600 ring-brand-500' : 'border-brand-400 ring-brand-200'
+                        }`}
+                        style={{
+                          fontSize: Math.max(fontSizePx, 9),
+                          fontWeight: pos.bold ? 700 : 500,
+                          transform: `translateX(${
+                            key !== 'date' && pos.align === 'center'
+                              ? '-50%'
+                              : key !== 'date' && pos.align === 'right'
+                                ? '-100%'
+                                : '0'
+                          })`
+                        }}
+                        title={FIELD_LABELS[key]}
+                      >
+                        {key === 'date' ? (
+                          <>
+                            <span>{sampleText.date.split(' ')[0]}</span>
+                            <span style={{ marginLeft: calibration.dateGapDayMonthMm * pxPerMm }}>
+                              {sampleText.date.split(' ')[1]}
+                            </span>
+                            <span style={{ marginLeft: calibration.dateGapMonthYearMm * pxPerMm }}>
+                              {sampleText.date.split(' ')[2]}
+                            </span>
+                          </>
+                        ) : (
+                          sampleText[key]
+                        )}
+                      </div>
+                    </div>
+                  </Draggable>
+                )
+              })}
+            </div>
+          </div>
+        </ModalBody>
+
+        <ModalFooter className="justify-between px-7 pb-7">
+          <p className="text-[12.5px] text-ink-400">
             Forma: {calibration.pageWidthMm} × {calibration.pageHeightMm} mm
           </p>
           <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 font-semibold text-slate-700 hover:bg-slate-50"
-            >
+            <Button variant="flat" radius="full" onPress={onClose}>
               Cancelar
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-2 rounded-lg bg-brand-600 px-5 py-2.5 font-bold text-white shadow-sm hover:bg-brand-700 disabled:opacity-60"
+            </Button>
+            <Button
+              color="primary"
+              radius="full"
+              className="font-semibold shadow-boton"
+              isLoading={saving}
+              startContent={!saving && <Save size={16} />}
+              onPress={handleSave}
             >
-              <Save size={16} /> {saving ? 'Guardando…' : 'Guardar'}
-            </button>
+              Guardar
+            </Button>
           </div>
-        </div>
-      </div>
-    </div>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
   )
 }

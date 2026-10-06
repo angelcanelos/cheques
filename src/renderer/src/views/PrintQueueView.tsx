@@ -1,14 +1,31 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Printer, Trash2 } from 'lucide-react'
+import {
+  Alert,
+  Button,
+  Select,
+  SelectItem,
+  Table,
+  TableBody,
+  TableCell,
+  TableColumn,
+  TableHeader,
+  TableRow,
+  Tooltip
+} from '@heroui/react'
+import type { Selection } from '@heroui/react'
+import { Printer, Trash2 } from 'lucide-react'
+import PageHeader from '../components/PageHeader'
 import { centsToAmount, formatCurrency } from '../lib/currency'
 import { notifyChecksChanged } from '../lib/events'
 import { useDialogs } from '../components/Dialogs'
-import { CatalogMode, modeSingular, modeTitle } from '../lib/mode'
+import { CatalogMode, modeSingular } from '../lib/mode'
 import type { CalibrationSettings, CheckRecord } from '@shared/types'
 
 interface PrintQueueViewProps {
   mode: CatalogMode
 }
+
+const AUTO_KEY = '__auto__'
 
 export default function PrintQueueView({ mode }: PrintQueueViewProps): JSX.Element {
   const { confirm } = useDialogs()
@@ -17,7 +34,7 @@ export default function PrintQueueView({ mode }: PrintQueueViewProps): JSX.Eleme
   const [calibration, setCalibration] = useState<CalibrationSettings | null>(null)
   const [printers, setPrinters] = useState<{ name: string; displayName: string }[]>([])
   const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
+  const [message, setMessage] = useState<{ kind: 'success' | 'danger'; text: string } | null>(null)
 
   useEffect(() => {
     ;(async () => {
@@ -40,27 +57,25 @@ export default function PrintQueueView({ mode }: PrintQueueViewProps): JSX.Eleme
     notifyChecksChanged()
   }
 
-  function toggle(id: string): void {
-    setSelected((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+  function handleSelection(keys: Selection): void {
+    setSelected(keys === 'all' ? new Set(pending.map((c) => c.id)) : new Set(Array.from(keys, String)))
   }
 
-  async function handlePrinterChange(name: string): Promise<void> {
+  const currentPrinter =
+    (calibration?.printMode === 'windows' ? calibration.windowsPrinterName : calibration?.printerName) ?? null
+
+  async function handlePrinterChange(name: string | null): Promise<void> {
     if (!calibration) return
     const updated =
       calibration.printMode === 'windows'
-        ? { ...calibration, windowsPrinterName: name || null }
-        : { ...calibration, printerName: name || null }
+        ? { ...calibration, windowsPrinterName: name }
+        : { ...calibration, printerName: name }
     setCalibration(updated)
     await window.api.calibration.save(updated)
   }
 
   async function handleDelete(id: string): Promise<void> {
-    if (!(await confirm('¿Eliminar este cheque pendiente? No se imprimirá.'))) return
+    if (!(await confirm('¿Eliminar este cheque pendiente? No se imprimirá.', true))) return
     await window.api.checks.deletePending(id)
     await reload()
   }
@@ -70,11 +85,11 @@ export default function PrintQueueView({ mode }: PrintQueueViewProps): JSX.Eleme
     try {
       await window.api.print.quickTest(calibration.printerName)
       setMessage({
-        kind: 'ok',
+        kind: 'success',
         text: 'Se envió una línea de prueba. Debe imprimirse "PRUEBA - CHEQUES APP" (gasta solo una línea).'
       })
     } catch (err) {
-      setMessage({ kind: 'error', text: `No se pudo enviar la prueba: ${(err as Error).message}` })
+      setMessage({ kind: 'danger', text: `No se pudo enviar la prueba: ${(err as Error).message}` })
     }
   }
 
@@ -88,158 +103,159 @@ export default function PrintQueueView({ mode }: PrintQueueViewProps): JSX.Eleme
     try {
       const count = await window.api.print.batch(toPrint.map((c) => c.id))
       setMessage({
-        kind: 'ok',
+        kind: 'success',
         text: `Se enviaron ${count} cheque${count === 1 ? '' : 's'} a la impresora (${count} forma${
           count === 1 ? '' : 's'
         }).`
       })
       await reload()
     } catch (err) {
-      setMessage({ kind: 'error', text: `No se pudo imprimir: ${(err as Error).message}` })
+      setMessage({ kind: 'danger', text: `No se pudo imprimir: ${(err as Error).message}` })
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-10 py-9">
-      <div className="mb-7 flex items-center gap-3">
-        <Printer className="text-brand-600" size={30} />
-        <h1 className="text-2xl font-bold text-slate-900">Imprimir cheques</h1>
-      </div>
-
-      <div className="mb-5 rounded-lg bg-white p-5 shadow-sm">
-        <label className="mb-1.5 block text-sm font-semibold text-slate-600">Impresora</label>
-        <select
-          value={
-            (calibration?.printMode === 'windows'
-              ? calibration.windowsPrinterName
-              : calibration?.printerName) ?? ''
-          }
-          onChange={(e) => handlePrinterChange(e.target.value)}
-          className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2.5 text-base"
-        >
-          <option value="">
-            {calibration?.printMode === 'escp'
-              ? '(Elige la impresora)'
-              : '(Automática: la Epson)'}
-          </option>
-          {printers.map((p) => (
-            <option key={p.name} value={p.name}>
-              {p.displayName}
-            </option>
-          ))}
-        </select>
-        <div className="mt-3 flex items-center gap-3">
-          {calibration?.printMode === 'escp' && (
-          <button
-            onClick={handleQuickTest}
-            disabled={!calibration?.printerName}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+    <div className="mx-auto max-w-5xl px-10 py-9">
+      <PageHeader
+        icon={Printer}
+        title="Imprimir cheques"
+        subtitle={`${pending.length} pendiente${pending.length === 1 ? '' : 's'} por imprimir.`}
+        action={
+          <Button
+            color="primary"
+            radius="full"
+            size="lg"
+            isLoading={busy}
+            isDisabled={toPrint.length === 0 || needsPrinter}
+            startContent={!busy && <Printer size={20} />}
+            className="h-14 px-7 font-semibold shadow-boton"
+            onPress={handlePrint}
           >
-            Probar conexión (1 línea)
-          </button>
+            {busy ? 'Imprimiendo…' : `Imprimir ${toPrint.length} cheque${toPrint.length === 1 ? '' : 's'}`}
+          </Button>
+        }
+      />
+
+      <div className="card mb-6 p-6">
+        <div className="flex flex-wrap items-end gap-4">
+          <Select
+            label="Impresora"
+            labelPlacement="outside"
+            radius="lg"
+            size="lg"
+            disallowEmptySelection
+            selectedKeys={[currentPrinter ?? AUTO_KEY]}
+            onSelectionChange={(keys) => {
+              const key = String(Array.from(keys)[0] ?? AUTO_KEY)
+              handlePrinterChange(key === AUTO_KEY ? null : key)
+            }}
+            className="max-w-md flex-1"
+            classNames={{ trigger: 'bg-surface-muted shadow-none' }}
+          >
+            {[
+              <SelectItem key={AUTO_KEY}>
+                {calibration?.printMode === 'escp' ? '(Elige la impresora)' : '(Automática: la Epson)'}
+              </SelectItem>,
+              ...printers.map((p) => <SelectItem key={p.name}>{p.displayName}</SelectItem>)
+            ]}
+          </Select>
+          {calibration?.printMode === 'escp' && (
+            <Button
+              variant="flat"
+              radius="full"
+              isDisabled={!calibration.printerName}
+              onPress={handleQuickTest}
+            >
+              Probar conexión (1 línea)
+            </Button>
           )}
-          <span className="text-xs text-slate-400">
-            {calibration?.printMode === 'windows'
-              ? 'Modo Windows: imprime con la letra de la computadora, sin abrir ventanas.'
-              : 'Si no sale nada, en Windows crea una impresora con el driver "Generic / Text Only" en el mismo puerto USB y elígela aquí.'}
-          </span>
         </div>
-        <p className="mt-3 text-sm text-slate-500">
-          Antes de imprimir, acomoda la forma continua con el borde superior del primer cheque a la
-          altura del cabezal. Se imprime un cheque por forma y el papel avanza solo al siguiente.
+        <p className="mt-4 text-[13px] text-ink-500">
+          {calibration?.printMode === 'windows'
+            ? 'Modo Windows: imprime con la letra de la computadora, sin abrir ventanas. '
+            : 'Si no sale nada, en Windows crea una impresora con el driver "Generic / Text Only" en el mismo puerto USB y elígela aquí. '}
+          Antes de imprimir, acomoda la forma continua con el borde superior del primer cheque a la altura
+          del cabezal. Se imprime un cheque por forma y el papel avanza solo al siguiente.
         </p>
       </div>
 
       {needsPrinter && (
-        <div className="mb-5 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-          <AlertTriangle size={18} /> Elige la impresora para poder imprimir.
-        </div>
+        <Alert color="warning" variant="flat" radius="lg" className="mb-5" title="Elige la impresora para poder imprimir." />
       )}
 
-      <div className="overflow-hidden rounded-lg bg-white shadow-sm">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-            <tr>
-              <th className="w-12 px-4 py-3">
-                <input
-                  type="checkbox"
-                  checked={pending.length > 0 && selected.size === pending.length}
-                  onChange={(e) =>
-                    setSelected(e.target.checked ? new Set(pending.map((c) => c.id)) : new Set())
-                  }
-                />
-              </th>
-              <th className="px-4 py-3">Fecha</th>
-              <th className="px-4 py-3">{modeSingular(mode)}</th>
-              <th className="px-4 py-3">Monto</th>
-              <th className="w-12 px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody>
-            {pending.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
-                  No hay cheques pendientes. Guárdalos desde &quot;Emitir Cheque&quot;.
-                </td>
-              </tr>
-            )}
-            {pending.map((c, index) => (
-              <tr key={c.id} className="border-t border-slate-100 hover:bg-slate-50">
-                <td className="px-4 py-3">
-                  <input
-                    type="checkbox"
-                    checked={selected.has(c.id)}
-                    onChange={() => toggle(c.id)}
-                  />
-                </td>
-                <td className="px-4 py-3">{c.checkDate.split('-').reverse().join('/')}</td>
-                <td className="px-4 py-3 font-medium">
-                  <span className="mr-2 text-slate-400">{index + 1}.</span>
-                  {c.workerName}
-                </td>
-                <td className="px-4 py-3">{formatCurrency(centsToAmount(c.amountCents))}</td>
-                <td className="px-4 py-3">
-                  <button
-                    onClick={() => handleDelete(c.id)}
-                    title="Eliminar"
-                    className="text-slate-400 hover:text-red-600"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="panel-lista p-3 sm:p-4">
+        <Table
+          aria-label="Cheques pendientes"
+          removeWrapper
+          isHeaderSticky
+          selectionMode="multiple"
+          color="primary"
+          selectedKeys={selected}
+          onSelectionChange={handleSelection}
+          classNames={{
+            base: 'max-h-[520px] overflow-auto',
+            th: 'bg-transparent text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-500 border-b border-surface-border',
+            td: 'py-3.5 text-[15px]',
+            tr: 'transition-colors data-[hover=true]:bg-brand-50/50'
+          }}
+        >
+          <TableHeader>
+            <TableColumn>FECHA</TableColumn>
+            <TableColumn>{modeSingular(mode).toUpperCase()}</TableColumn>
+            <TableColumn>MONTO</TableColumn>
+            <TableColumn width={60} align="end">
+              {' '}
+            </TableColumn>
+          </TableHeader>
+          <TableBody
+            items={pending}
+            emptyContent='No hay cheques pendientes. Guárdalos desde "Emitir Cheque".'
+          >
+            {(c) => {
+              const index = pending.findIndex((x) => x.id === c.id)
+              return (
+                <TableRow key={c.id}>
+                  <TableCell>{c.checkDate.split('-').reverse().join('/')}</TableCell>
+                  <TableCell className="font-medium text-ink-900">
+                    <span className="mr-2 text-ink-400">{index + 1}.</span>
+                    {c.workerName}
+                  </TableCell>
+                  <TableCell>{formatCurrency(centsToAmount(c.amountCents))}</TableCell>
+                  <TableCell>
+                    <Tooltip content="Eliminar" color="danger" closeDelay={0}>
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="light"
+                        radius="full"
+                        color="danger"
+                        aria-label="Eliminar cheque pendiente"
+                        onPress={() => handleDelete(c.id)}
+                      >
+                        <Trash2 size={16} />
+                      </Button>
+                    </Tooltip>
+                  </TableCell>
+                </TableRow>
+              )
+            }}
+          </TableBody>
+        </Table>
       </div>
 
       {message && (
-        <div
-          className={`mt-5 flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium ${
-            message.kind === 'ok'
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-              : 'border-red-200 bg-red-50 text-red-700'
-          }`}
-        >
-          {message.kind === 'ok' ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
-          {message.text}
-        </div>
+        <Alert
+          color={message.kind}
+          variant="flat"
+          radius="lg"
+          className="mt-5"
+          title={message.text}
+          isClosable
+          onClose={() => setMessage(null)}
+        />
       )}
-
-      <div className="mt-6 flex justify-end">
-        <button
-          onClick={handlePrint}
-          disabled={toPrint.length === 0 || busy || needsPrinter}
-          className="flex items-center gap-2 rounded-lg bg-brand-600 px-7 py-3.5 font-bold text-white shadow-sm hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Printer size={20} />
-          {busy
-            ? 'Imprimiendo…'
-            : `Imprimir ${toPrint.length} cheque${toPrint.length === 1 ? '' : 's'}`}
-        </button>
-      </div>
     </div>
   )
 }

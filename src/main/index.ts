@@ -99,11 +99,13 @@ function registerIpcHandlers(): void {
     return checks.length
   })
 
-  ipcMain.handle('print:reprint', async (_e, id: string) => {
+  // Reimprime uno o varios cheques ya impresos (una forma por cheque, en el orden elegido).
+  ipcMain.handle('print:reprint', async (_e, ids: string[]) => {
     const calibration = store.loadCalibration()
-    const checks = store.getChecks([id])
+    const checks = store.getChecks(ids).filter((c) => c.status === 'printed')
     await printing.printChecks(checks, calibration)
-    store.markReprinted(id)
+    checks.forEach((c) => store.markReprinted(c.id))
+    return checks.length
   })
 
   ipcMain.handle('print:quickTest', (_e, printerName: string) =>
@@ -127,6 +129,7 @@ function registerIpcHandlers(): void {
 }
 
 app.whenReady().then(() => {
+  store.seedEjidatariosOnce()
   registerIpcHandlers()
   createWindow()
 

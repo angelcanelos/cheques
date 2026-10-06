@@ -1,20 +1,34 @@
-import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, ReactNode, useCallback, useContext, useRef, useState } from 'react'
+import { Button, Input, Modal, ModalBody, ModalContent, ModalFooter } from '@heroui/react'
+import { CircleAlert, Info, Pencil, TriangleAlert } from 'lucide-react'
 
 /**
- * Diálogos propios (avisar, confirmar, pedir un texto).
+ * Diálogos propios (avisar, confirmar, pedir un texto) hechos con el Modal de HeroUI.
  *
  * Se usan en lugar de alert/confirm/prompt del navegador porque en Electron `prompt` no
- * existe, y después de un alert/confirm nativo la ventana pierde el foco del teclado
- * (los campos dejaban de aceptar texto hasta cerrar la app).
+ * existe y, después de un alert/confirm nativo, la ventana pierde el foco del teclado.
  */
+export interface AlertOptions {
+  title?: string
+  /** `warning` para avisos que el usuario puede corregir; `error` para fallas. */
+  tone?: 'info' | 'warning' | 'error'
+}
+
 type Request =
-  | { kind: 'alert'; message: string; resolve: () => void }
-  | { kind: 'confirm'; message: string; resolve: (ok: boolean) => void }
-  | { kind: 'prompt'; message: string; defaultValue: string; upper: boolean; resolve: (v: string | null) => void }
+  | { kind: 'alert'; message: string; options: AlertOptions; resolve: () => void }
+  | { kind: 'confirm'; message: string; danger: boolean; resolve: (ok: boolean) => void }
+  | {
+      kind: 'prompt'
+      message: string
+      defaultValue: string
+      upper: boolean
+      resolve: (v: string | null) => void
+    }
 
 interface DialogApi {
-  alert: (message: string) => Promise<void>
-  confirm: (message: string) => Promise<boolean>
+  alert: (message: string, options?: AlertOptions) => Promise<void>
+  /** `danger` pinta el botón de rojo (para eliminar). */
+  confirm: (message: string, danger?: boolean) => Promise<boolean>
   prompt: (message: string, defaultValue?: string, upper?: boolean) => Promise<string | null>
 }
 
@@ -28,18 +42,15 @@ export function useDialogs(): DialogApi {
 
 export function DialogProvider({ children }: { children: ReactNode }): JSX.Element {
   const [queue, setQueue] = useState<Request[]>([])
-  const previousFocus = useRef<HTMLElement | null>(null)
+  const nextKey = useRef(0)
 
-  const enqueue = useCallback((req: Request) => {
-    setQueue((q) => {
-      if (q.length === 0) previousFocus.current = document.activeElement as HTMLElement | null
-      return [...q, req]
-    })
-  }, [])
+  const enqueue = useCallback((req: Request) => setQueue((q) => [...q, req]), [])
 
   const api: DialogApi = {
-    alert: (message) => new Promise((resolve) => enqueue({ kind: 'alert', message, resolve })),
-    confirm: (message) => new Promise((resolve) => enqueue({ kind: 'confirm', message, resolve })),
+    alert: (message, options = {}) =>
+      new Promise((resolve) => enqueue({ kind: 'alert', message, options, resolve })),
+    confirm: (message, danger = false) =>
+      new Promise((resolve) => enqueue({ kind: 'confirm', message, danger, resolve })),
     prompt: (message, defaultValue = '', upper = false) =>
       new Promise((resolve) => enqueue({ kind: 'prompt', message, defaultValue, upper, resolve }))
   }
@@ -47,32 +58,20 @@ export function DialogProvider({ children }: { children: ReactNode }): JSX.Eleme
   const current = queue[0]
 
   function close(): void {
+    nextKey.current += 1
     setQueue((q) => q.slice(1))
-    // Devuelve el cursor al campo que se estaba usando.
-    window.setTimeout(() => previousFocus.current?.focus(), 0)
   }
 
   return (
     <DialogContext.Provider value={api}>
       {children}
-      {current && <DialogView key={queue.length + current.message} request={current} onClose={close} />}
+      {current && <DialogView key={nextKey.current} request={current} onClose={close} />}
     </DialogContext.Provider>
   )
 }
 
 function DialogView({ request, onClose }: { request: Request; onClose: () => void }): JSX.Element {
   const [text, setText] = useState(request.kind === 'prompt' ? request.defaultValue : '')
-  const inputRef = useRef<HTMLInputElement>(null)
-  const okRef = useRef<HTMLButtonElement>(null)
-
-  useEffect(() => {
-    if (request.kind === 'prompt') {
-      inputRef.current?.focus()
-      inputRef.current?.select()
-    } else {
-      okRef.current?.focus()
-    }
-  }, [request])
 
   function accept(): void {
     if (request.kind === 'alert') request.resolve()
@@ -88,47 +87,84 @@ function DialogView({ request, onClose }: { request: Request; onClose: () => voi
     onClose()
   }
 
+  const alertTone = request.kind === 'alert' ? (request.options.tone ?? 'info') : null
+  const Icon =
+    alertTone === 'error'
+      ? CircleAlert
+      : alertTone === 'warning'
+        ? TriangleAlert
+        : request.kind === 'alert'
+          ? Info
+          : request.kind === 'confirm'
+            ? TriangleAlert
+            : Pencil
+  const danger = request.kind === 'confirm' && request.danger
+  const tone =
+    danger || alertTone === 'error'
+      ? 'bg-danger-bg text-danger'
+      : alertTone === 'warning' || request.kind === 'confirm'
+        ? 'bg-warning-bg text-warning'
+        : 'bg-brand-50 text-brand-600'
+  const title = request.kind === 'alert' ? request.options.title : undefined
+
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6"
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') cancel()
-        if (e.key === 'Enter' && request.kind !== 'confirm') {
-          e.preventDefault()
-          accept()
-        }
-      }}
+    <Modal
+      isOpen
+      onOpenChange={(open) => !open && cancel()}
+      placement="center"
+      backdrop="blur"
+      size="md"
+      classNames={{ base: 'rounded-[28px]' }}
     >
-      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
-        <p className="whitespace-pre-line text-base text-slate-800">{request.message}</p>
-        {request.kind === 'prompt' && (
-          <input
-            ref={inputRef}
-            value={text}
-            onChange={(e) =>
-              setText(request.upper ? e.target.value.toLocaleUpperCase('es-MX') : e.target.value)
-            }
-            className="mt-4 w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-3 text-lg outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-          />
-        )}
-        <div className="mt-6 flex justify-end gap-3">
-          {request.kind !== 'alert' && (
-            <button
-              onClick={cancel}
-              className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              Cancelar
-            </button>
+      <ModalContent>
+        <ModalBody className="px-7 pb-2 pt-7">
+          <div className="flex items-start gap-4">
+            <span className={`flex h-11 w-11 flex-none items-center justify-center rounded-full ${tone}`}>
+              <Icon className="h-6 w-6" strokeWidth={2.25} />
+            </span>
+            <div className="flex-1 pt-1">
+              {title && <h2 className="mb-1 text-[1.125rem] font-semibold text-ink-900">{title}</h2>}
+              <p
+                className={`whitespace-pre-line text-[15px] leading-relaxed ${
+                  title ? 'text-ink-600' : 'pt-1 text-ink-800'
+                }`}
+              >
+                {request.message}
+              </p>
+            </div>
+          </div>
+          {request.kind === 'prompt' && (
+            <Input
+              autoFocus
+              radius="lg"
+              size="lg"
+              value={text}
+              onValueChange={(v) => setText(request.upper ? v.toLocaleUpperCase('es-MX') : v)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') accept()
+                else if (e.key === 'Escape') cancel()
+              }}
+              classNames={{ inputWrapper: 'bg-surface-muted', input: 'text-lg' }}
+            />
           )}
-          <button
-            ref={okRef}
-            onClick={accept}
-            className="rounded-lg bg-brand-600 px-5 py-2.5 font-bold text-white hover:bg-brand-700"
+        </ModalBody>
+        <ModalFooter className="px-7 pb-7 pt-4">
+          {request.kind !== 'alert' && (
+            <Button variant="flat" radius="full" onPress={cancel}>
+              Cancelar
+            </Button>
+          )}
+          <Button
+            color={danger ? 'danger' : 'primary'}
+            radius="full"
+            className="font-semibold"
+            autoFocus={request.kind !== 'prompt'}
+            onPress={accept}
           >
-            {request.kind === 'alert' ? 'Entendido' : 'Aceptar'}
-          </button>
-        </div>
-      </div>
-    </div>
+            {request.kind === 'alert' ? 'Entendido' : danger ? 'Eliminar' : 'Aceptar'}
+          </Button>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
   )
 }

@@ -1,5 +1,6 @@
 import logo from '../assets/logo.png'
 import { FileText, History, Printer, Settings, SlidersHorizontal, Users } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import type { CatalogMode } from '../lib/mode'
 import { modeTitle } from '../lib/mode'
 
@@ -13,6 +14,13 @@ interface SidebarProps {
   onModeChange: (mode: CatalogMode) => void
 }
 
+interface NavItem {
+  key: ViewKey
+  label: string
+  icon: LucideIcon
+  badge?: number
+}
+
 export default function Sidebar({
   active,
   onSelect,
@@ -20,108 +28,69 @@ export default function Sidebar({
   mode,
   onModeChange
 }: SidebarProps): JSX.Element {
+  const items: NavItem[] = [
+    { key: 'write', label: 'Emitir Cheque', icon: FileText },
+    { key: 'print', label: 'Imprimir', icon: Printer, badge: pendingCount },
+    { key: 'workers', label: modeTitle(mode), icon: Users },
+    { key: 'history', label: 'Historial', icon: History },
+    { key: 'calibration', label: 'Calibración', icon: SlidersHorizontal },
+    { key: 'settings', label: 'Ajustes', icon: Settings }
+  ]
+
   return (
-    <nav className="flex w-64 shrink-0 flex-col bg-white py-4">
-      <div className="mb-3 border-b border-slate-100 px-5 pb-4">
-        <img src={logo} alt="Forestal Tezains" className="w-full" draggable={false} />
+    <aside className="flex h-full w-[284px] flex-none flex-col border-r border-surface-border bg-white py-6">
+      <div className="mb-8 px-7">
+        <img src={logo} alt="Forestal Tezains" className="w-full object-contain" draggable={false} />
       </div>
 
-      <button
-        onClick={() => onSelect('write')}
-        className={`flex items-center gap-3 px-6 py-4 text-left text-[15px] transition ${
-          active === 'write'
-            ? 'bg-brand-50 font-semibold text-brand-700'
-            : 'text-slate-600 hover:bg-slate-50'
-        }`}
-      >
-        <FileText size={20} strokeWidth={2} />
-        <span className="flex-1">Emitir Cheque</span>
-      </button>
-      <button
-        onClick={() => onSelect('print')}
-        className={`flex items-center gap-3 px-6 py-4 text-left text-[15px] transition ${
-          active === 'print'
-            ? 'bg-brand-50 font-semibold text-brand-700'
-            : 'text-slate-600 hover:bg-slate-50'
-        }`}
-      >
-        <Printer size={20} strokeWidth={2} />
-        <span className="flex-1">Imprimir</span>
-        {pendingCount > 0 && (
-          <span className="rounded-full bg-brand-600 px-2 py-0.5 text-xs font-bold text-white">
-            {pendingCount}
-          </span>
-        )}
-      </button>
-      <button
-        onClick={() => onSelect('workers')}
-        className={`flex items-center gap-3 px-6 py-4 text-left text-[15px] transition ${
-          active === 'workers'
-            ? 'bg-brand-50 font-semibold text-brand-700'
-            : 'text-slate-600 hover:bg-slate-50'
-        }`}
-      >
-        <Users size={20} strokeWidth={2} />
-        <span className="flex-1">{modeTitle(mode)}</span>
-      </button>
-      <button
-        onClick={() => onSelect('history')}
-        className={`flex items-center gap-3 px-6 py-4 text-left text-[15px] transition ${
-          active === 'history'
-            ? 'bg-brand-50 font-semibold text-brand-700'
-            : 'text-slate-600 hover:bg-slate-50'
-        }`}
-      >
-        <History size={20} strokeWidth={2} />
-        <span className="flex-1">Historial</span>
-      </button>
-      <button
-        onClick={() => onSelect('calibration')}
-        className={`flex items-center gap-3 px-6 py-4 text-left text-[15px] transition ${
-          active === 'calibration'
-            ? 'bg-brand-50 font-semibold text-brand-700'
-            : 'text-slate-600 hover:bg-slate-50'
-        }`}
-      >
-        <SlidersHorizontal size={20} strokeWidth={2} />
-        <span className="flex-1">Calibración</span>
-      </button>
-      <button
-        onClick={() => onSelect('settings')}
-        className={`flex items-center gap-3 px-6 py-4 text-left text-[15px] transition ${
-          active === 'settings'
-            ? 'bg-brand-50 font-semibold text-brand-700'
-            : 'text-slate-600 hover:bg-slate-50'
-        }`}
-      >
-        <Settings size={20} strokeWidth={2} />
-        <span className="flex-1">Ajustes</span>
-      </button>
+      <nav className="flex flex-col gap-1.5 px-4">
+        {items.map(({ key, label, icon: Icon, badge }) => {
+          const isActive = key === active
+          return (
+            <button
+              key={key}
+              onClick={() => onSelect(key)}
+              className={`group flex items-center gap-3 rounded-2xl px-3.5 py-3 text-left text-[15px] transition-colors ${
+                isActive
+                  ? 'bg-brand-50 font-medium text-brand-700'
+                  : 'text-ink-600 hover:bg-surface-muted hover:text-ink-900'
+              }`}
+            >
+              <Icon className="h-[19px] w-[19px] flex-none" strokeWidth={1.9} />
+              <span className="flex-1">{label}</span>
+              {badge !== undefined && badge > 0 ? (
+                <span className="rounded-full bg-brand-600 px-2 py-0.5 text-xs font-semibold text-white">
+                  {badge}
+                </span>
+              ) : (
+                isActive && <span className="h-1.5 w-1.5 rounded-full bg-brand-600" />
+              )}
+            </button>
+          )
+        })}
+      </nav>
 
-      <div className="mt-auto px-4 pt-4">
-        <div className="flex rounded-lg bg-slate-100 p-1">
-          <button
-            onClick={() => onModeChange('trabajadores')}
-            className={`flex-1 rounded-md py-2 text-sm font-semibold transition ${
-              mode === 'trabajadores'
-                ? 'bg-brand-600 text-white shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            Trabajadores
-          </button>
-          <button
-            onClick={() => onModeChange('ejidatarios')}
-            className={`flex-1 rounded-md py-2 text-sm font-semibold transition ${
-              mode === 'ejidatarios'
-                ? 'bg-brand-600 text-white shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            Ejidatarios
-          </button>
+      <div className="mt-auto px-5 pt-4">
+        <div className="mb-2 px-1 text-[11.5px] font-semibold uppercase tracking-[0.12em] text-ink-400">
+          Catálogo
         </div>
+        <div className="flex rounded-full bg-surface-muted p-1">
+          {(['trabajadores', 'ejidatarios'] as CatalogMode[]).map((m) => (
+            <button
+              key={m}
+              onClick={() => onModeChange(m)}
+              className={`flex-1 rounded-full py-2 text-[13px] font-semibold transition-all ${
+                mode === m
+                  ? 'bg-brand-600 text-white shadow-boton'
+                  : 'text-ink-500 hover:text-ink-800'
+              }`}
+            >
+              {modeTitle(m)}
+            </button>
+          ))}
+        </div>
+        <p className="mt-5 text-center text-[12px] text-ink-400">Forestal Tezains</p>
       </div>
-    </nav>
+    </aside>
   )
 }

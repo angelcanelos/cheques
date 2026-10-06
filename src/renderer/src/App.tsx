@@ -14,6 +14,10 @@ export default function App(): JSX.Element {
   const [pendingCount, setPendingCount] = useState(0)
   const [mode, setMode] = useState<CatalogMode>(loadMode)
 
+  useEffect(() => {
+    document.documentElement.dataset.mode = mode
+  }, [mode])
+
   const refreshPending = useCallback(async (): Promise<void> => {
     setPendingCount((await window.api.checks.listPending(mode)).length)
   }, [mode])
@@ -30,10 +34,7 @@ export default function App(): JSX.Element {
   }
 
   return (
-    <div
-      data-mode={mode}
-      className="flex h-screen w-screen bg-slate-100 text-slate-900"
-    >
+    <div className="fondo-app flex h-screen w-screen text-ink-900">
       <Sidebar
         active={view}
         onSelect={setView}

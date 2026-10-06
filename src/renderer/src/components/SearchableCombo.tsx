@@ -10,6 +10,8 @@ interface SearchableComboProps {
   id?: string
   /** Ref externo al <input>, para poder enfocarlo desde afuera. */
   inputRef?: RefObject<HTMLInputElement>
+  /** Clases del <input> (para variantes de tamaño). */
+  inputClassName?: string
 }
 
 /**
@@ -27,7 +29,8 @@ export default function SearchableCombo({
   placeholder,
   onConfirm,
   id,
-  inputRef: externalRef
+  inputRef: externalRef,
+  inputClassName = 'form-input w-full px-4 py-3 text-lg'
 }: SearchableComboProps): JSX.Element {
   const [open, setOpen] = useState(false)
   const [highlighted, setHighlighted] = useState(-1)
@@ -104,12 +107,12 @@ export default function SearchableCombo({
         onFocus={() => value.trim() && setOpen(true)}
         onBlur={() => window.setTimeout(() => setOpen(false), 120)}
         onKeyDown={handleKeyDown}
-        className="w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-3 text-lg text-slate-900 shadow-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+        className={inputClassName}
       />
       {open && suggestions.length > 0 && (
         <ul
           ref={listRef}
-          className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg"
+          className="absolute z-20 mt-1 w-full overflow-hidden rounded-2xl border border-surface-border bg-white shadow-popover p-1.5"
         >
           {suggestions.map((s, idx) => (
             <li key={s}>
@@ -117,8 +120,8 @@ export default function SearchableCombo({
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => commit(s)}
-                className={`block w-full px-4 py-2 text-left text-base ${
-                  idx === highlighted ? 'bg-brand-50 text-brand-700' : 'text-slate-800 hover:bg-slate-50'
+                className={`block w-full rounded-xl px-4 py-2.5 text-left text-[17px] ${
+                  idx === highlighted ? 'bg-brand-50 text-brand-700' : 'text-ink-800 hover:bg-surface-muted'
                 }`}
               >
                 {s}

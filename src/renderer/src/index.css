@@ -1,23 +1,95 @@
+@import '@fontsource/outfit/latin-400.css';
+@import '@fontsource/outfit/latin-500.css';
+@import '@fontsource/outfit/latin-600.css';
+@import '@fontsource/outfit/latin-700.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  /* Trabajadores: azul (por defecto) */
-  --brand-50: 239 246 255;
-  --brand-100: 219 234 254;
-  --brand-500: 37 99 235;
-  --brand-600: 29 78 216;
-  --brand-700: 30 64 175;
+  /* Trabajadores: paleta índigo del sistema de diseño (fletes-v2) */
+  --c-brand-50: 241 240 255;
+  --c-brand-100: 229 226 255;
+  --c-brand-200: 206 200 254;
+  --c-brand-300: 173 163 252;
+  --c-brand-400: 140 126 248;
+  --c-brand-500: 111 96 241;
+  --c-brand-600: 91 74 230;
+  --c-brand-700: 75 59 202;
+  --c-brand-800: 62 51 163;
+  --c-brand-900: 52 45 128;
+  --c-ink-950: 12 16 34;
+  --c-ink-900: 25 28 46;
+  --c-ink-800: 38 42 64;
+  --c-ink-700: 57 62 87;
+  --c-ink-600: 81 87 111;
+  --c-ink-500: 104 110 135;
+  --c-ink-400: 141 147 169;
+  --c-ink-300: 180 185 202;
+  --c-ink-200: 216 219 230;
+  --c-ink-100: 236 238 244;
+  --c-surface-default: 243 244 248;
+  --c-surface-card: 255 255 255;
+  --c-surface-border: 229 231 239;
+  --c-surface-muted: 240 241 246;
+  --c-success-default: 21 128 61;
+  --c-success-bg: 220 245 229;
+  --c-warning-default: 180 83 9;
+  --c-warning-bg: 252 240 214;
+  --c-danger-default: 220 38 38;
+  --c-danger-bg: 253 228 228;
+  --fuente-app: 'Outfit', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --radio-panel: 28px;
+  --radio-card: 20px;
+  --sombra-panel: 0 1px 2px rgba(25, 28, 46, 0.03), 0 12px 32px -16px rgba(25, 28, 46, 0.1);
+  --sombra-card: 0 1px 2px rgba(25, 28, 46, 0.04);
+  --sombra-boton: 0 8px 20px -8px rgba(91, 74, 230, 0.65);
 }
 
-[data-mode='ejidatarios'] {
-  /* Ejidatarios: verde */
-  --brand-50: 240 253 244;
-  --brand-100: 220 252 231;
-  --brand-500: 22 163 74;
-  --brand-600: 21 128 61;
-  --brand-700: 22 101 52;
+/* Ejidatarios: se conserva la distinción por color usando la paleta verde del sistema
+   (la "clásica" de fletes-v2); todo lo demás (neutros, radios, sombras) es igual. */
+html[data-mode='ejidatarios'] {
+  --c-brand-50: 238 247 232;
+  --c-brand-100: 220 239 209;
+  --c-brand-200: 185 223 166;
+  --c-brand-300: 143 202 117;
+  --c-brand-400: 103 179 80;
+  --c-brand-500: 63 143 39;
+  --c-brand-600: 47 107 31;
+  --c-brand-700: 36 84 24;
+  --c-brand-800: 28 66 19;
+  --c-brand-900: 21 51 15;
+  --sombra-boton: 0 8px 20px -8px rgba(47, 107, 31, 0.6);
+  --heroui-primary-50: 96.0 48.4% 93.9%;
+  --heroui-primary-100: 98.0 48.4% 87.8%;
+  --heroui-primary-200: 100.0 47.1% 76.3%;
+  --heroui-primary-300: 101.6 44.5% 62.5%;
+  --heroui-primary-400: 106.1 39.4% 50.8%;
+  --heroui-primary-500: 106.2 57.1% 35.7%;
+  --heroui-primary-600: 107.4 55.1% 27.1%;
+  --heroui-primary-700: 108.0 55.6% 21.2%;
+  --heroui-primary-800: 108.5 55.3% 16.7%;
+  --heroui-primary-900: 110.0 54.5% 12.9%;
+  --heroui-primary: 107.4 55.1% 27.1%;
+  --heroui-focus: 107.4 55.1% 27.1%;
+  --heroui-primary-foreground: 0 0% 100%;
+}
+
+html[data-mode='trabajadores'] {
+  --heroui-primary-50: 244.0 100.0% 97.1%;
+  --heroui-primary-100: 246.2 100.0% 94.3%;
+  --heroui-primary-200: 246.7 96.4% 89.0%;
+  --heroui-primary-300: 246.7 93.7% 81.4%;
+  --heroui-primary-400: 246.9 89.7% 73.3%;
+  --heroui-primary-500: 246.2 83.8% 66.1%;
+  --heroui-primary-600: 246.5 75.7% 59.6%;
+  --heroui-primary-700: 246.7 57.4% 51.2%;
+  --heroui-primary-800: 245.9 52.3% 42.0%;
+  --heroui-primary-900: 245.1 48.0% 33.9%;
+  --heroui-primary: 246.5 75.7% 59.6%;
+  --heroui-focus: 246.5 75.7% 59.6%;
+  --heroui-primary-foreground: 0 0% 100%;
 }
 
 html,
@@ -26,13 +98,114 @@ body,
   height: 100%;
 }
 
+html,
 body {
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: theme('colors.surface.DEFAULT');
+  color: theme('colors.ink.900');
+  font-family: theme('fontFamily.sans');
   -webkit-font-smoothing: antialiased;
 }
 
-/* Selecciona todo el texto de un input numérico al enfocarlo, para que
-   escribir reemplace el valor en vez de tener que borrarlo primero. */
-input[data-select-on-focus]:focus {
+* {
+  scrollbar-color: theme('colors.ink.200') transparent;
+  scrollbar-width: thin;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: theme('colors.ink.200');
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: theme('colors.ink.300');
+}
+
+::selection {
+  background: theme('colors.brand.200');
+  color: theme('colors.brand.900');
+}
+
+:focus-visible {
+  outline: 2px solid theme('colors.brand.500');
+  outline-offset: 2px;
+}
+
+/* Casillas, botones de opción y barras toman el color de marca del modo actual. */
+input[type='checkbox'],
+input[type='radio'],
+input[type='range'] {
+  accent-color: rgb(var(--c-brand-600));
+}
+
+/* Los campos marcan el foco con su propio anillo (.form-input); sin esto se encimaba
+   un cuadro sobre el texto. */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
   outline: none;
+}
+
+@layer components {
+  /* Fondo del área de contenido: gris frío con un brillo cálido/violeta muy suave arriba. */
+  .fondo-app {
+    background:
+      radial-gradient(ellipse 60% 40% at 55% 30%, rgba(255, 237, 225, 0.75), transparent 70%),
+      radial-gradient(ellipse 50% 35% at 85% 10%, rgba(229, 226, 255, 0.6), transparent 70%),
+      theme('colors.surface.DEFAULT');
+  }
+  html[data-mode='ejidatarios'] .fondo-app {
+    background:
+      radial-gradient(ellipse 60% 40% at 55% 30%, rgba(255, 237, 225, 0.75), transparent 70%),
+      radial-gradient(ellipse 50% 35% at 85% 10%, rgba(220, 239, 209, 0.6), transparent 70%),
+      theme('colors.surface.DEFAULT');
+  }
+  .form-input {
+    @apply w-full rounded-xl border-[1.5px] border-surface-border bg-white px-3.5 py-2.5 text-[0.9rem] font-sans text-ink-900 transition-colors placeholder:text-ink-400;
+  }
+  .form-input:hover:not(:focus):not(:disabled) {
+    @apply border-ink-200;
+  }
+  .form-input:focus {
+    @apply border-brand-500 outline-none ring-4 ring-brand-100;
+  }
+  .form-input:disabled {
+    @apply cursor-not-allowed bg-surface-muted text-ink-400;
+  }
+  .form-label {
+    @apply text-[0.8125rem] font-semibold text-ink-700;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .btn-primary {
+    @apply btn bg-brand-600 text-white shadow-boton hover:-translate-y-px hover:bg-brand-700 disabled:hover:translate-y-0;
+  }
+  .btn-secondary {
+    @apply btn border border-surface-border bg-white text-ink-800 shadow-card hover:border-ink-200 hover:bg-surface-muted;
+  }
+  .btn-danger {
+    @apply btn bg-danger-bg text-danger hover:bg-[#fbd0d0];
+  }
+  .card {
+    @apply rounded-card border border-surface-border bg-surface-card shadow-card;
+  }
+  .panel-lista {
+    @apply rounded-panel border border-surface-border bg-white shadow-panel;
+  }
+  /* Encabezado de columna de las tablas */
+  .th {
+    @apply border-b border-surface-border px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-500;
+  }
+}
+
+/* Los iconos dentro de botones no deben encogerse cuando el botón es angosto. */
+button > svg {
+  flex-shrink: 0;
 }

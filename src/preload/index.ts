@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type {
   CalibrationSettings,
   CheckRecord,
+  Ejidatario,
   HistoryFilters,
   NewCheckInput,
   PersonType,
@@ -52,7 +53,7 @@ const api = {
   },
   print: {
     batch: (ids: string[]): Promise<number> => ipcRenderer.invoke('print:batch', ids),
-    reprint: (id: string): Promise<void> => ipcRenderer.invoke('print:reprint', id),
+    reprint: (ids: string[]): Promise<number> => ipcRenderer.invoke('print:reprint', ids),
     quickTest: (printerName: string): Promise<void> =>
       ipcRenderer.invoke('print:quickTest', printerName),
     fontTest: (calibration: CalibrationSettings): Promise<void> =>

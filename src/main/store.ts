@@ -2,9 +2,11 @@ import { app } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { EJIDATARIOS_SEED } from './ejidatariosSeed'
 import type {
   CalibrationSettings,
   CheckRecord,
+  Ejidatario,
   HistoryFilters,
   NewCheckInput,
   PersonType,
@@ -110,6 +112,24 @@ function loadEjidatarios(): Ejidatario[] {
 
 function saveEjidatarios(ejidatarios: Ejidatario[]): void {
   writeJson('ejidatarios.json', ejidatarios)
+}
+
+/**
+ * Agrega la lista inicial de ejidatarios una sola vez por instalación. Se mezcla con los que
+ * ya existan (sin duplicar) y, como queda una marca, los que se eliminen después no regresan.
+ */
+export function seedEjidatariosOnce(): void {
+  const marker = join(getDataDir(), 'ejidatarios.seeded')
+  if (existsSync(marker)) return
+  const current = loadEjidatarios()
+  const known = new Set(current.map((e) => e.name.trim().toLowerCase()))
+  const now = new Date().toISOString()
+  for (const name of EJIDATARIOS_SEED) {
+    if (known.has(name.toLowerCase())) continue
+    current.push({ id: randomUUID(), name, active: true, createdAt: now })
+  }
+  saveEjidatarios(current)
+  writeFileSync(marker, now, 'utf-8')
 }
 
 export function listActiveEjidatarios(): Ejidatario[] {
